@@ -25,15 +25,18 @@ def change_mp3_metadata(file_path, title, track_number, artist, album, year, gen
     tags.setall('TALB', [TALB(encoding=3, text=[str(album)])])
     tags.setall('TYER', [TYER(encoding=3, text=[str(year)])])
     tags.setall('TCON', [TCON(encoding=3, text=[str(genre)])])
+
     ## metadata for disk total
-    if disktotal <= 1:
-        disk_string = str(disktotal)
+    if int(disktotal) <= 1:
+        disk_string = disktotal
     else:
         disk_string = f"{disk}/{disktotal}"
     tags.add(TPOS(encoding=3, text=disk_string))
+
     ## set optional comment
     if comment != "empty":
         tags.setall('COMM', [COMM(encoding=3, text=[str(comment)])])
+
     ## set optional album art
     if pic_path != "empty":
         ### if the chosen picture file is jpg or png, assign mime to corresponding
@@ -70,25 +73,32 @@ def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comme
         pic_choice = int(input("[?] "))
         pic_path = os.path.join(dir_path, pic_file_list[pic_choice])
 
-    disktotal = "[?] What's the total amount of disks?\n[?] "
+    disktotal = input("[?] What's the total amount of disks?\n[?] ")
     if int(disktotal) > 1:
         yn_disknum = input("[?] Do you want to keep asking about the disk? If no, default is 1. (Y/n)\n[?] ")
     else:
         disk = 1
+
+    ## Loop individually handling individual tracks with individual info
     comment = "empty"
     for file in dir_list:
+        ### find mp3s, skip files that ain't mp3
         file_path = os.path.join(dir_path, file)
         if file[-4:].lower() != ".mp3":
             continue
+
+        ### for file/song in question, ask title and number of song
         print(f"[*] {file}")
         title = input("[?] What is the title of the song?\n[?] ")
         track_number = input("[?] What is the track number of this song?\n[?] ")
 
+        ### ask about comment, and if only one comment for all, change yn comment to prevent asking again
         if yn_comment.lower() == "y":
             comment = input("[?] What is the comment you want in the file(s)?\n[?] ")
             if all_comment.lower() == "y":
                 yn_comment = "prevent looping"
 
+        ### if there's more than 1 disk, keep asking what current disk of current song is
         if int(disktotal) > 1:
             if yn_disknum.lower() == "y":
                 disk = input("[?] What's the current disk?\n[?] ")
