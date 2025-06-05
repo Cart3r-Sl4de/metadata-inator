@@ -1,16 +1,19 @@
-import os, shutil
+import os
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TRCK, TPE1, TALB, TYER, TCON, COMM, APIC, TPOS
+from mutagen.id3 import ID3, TIT2, TRCK, TPE1, TALB, TYER, TCON, COMM, APIC, TPOS, USLT
 # filepath autocompletion
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
+# lyrics
+import lyricsgenius
 
 filetypes = [".mp3", ".flac", ".wav"]
 pic_filetypes = [".png", ".jpg", ".jpeg"]
 
 # The main metadata changer (pretty dang easy stuff), 1 at a time
-def change_mp3_metadata(file_path, title, track_number, artist, album, year, genre, comment, pic_path, disk, disktotal):
+def change_mp3_metadata(file_path, title, track_number, artist, album, year, genre, comment, pic_path, disk, disktotal, yn_lyrics):
     audio = MP3(file_path, ID3=ID3)
+    lang = "eng"
 
     ## if there ain't an ID3 tag, make one
     if not audio.tags:
@@ -37,7 +40,7 @@ def change_mp3_metadata(file_path, title, track_number, artist, album, year, gen
     if comment != "empty":
         tags.setall('COMM', [COMM(encoding=3, text=[str(comment)])])
 
-    ## set optional album art
+    ## set/inject optional album art
     if pic_path != "empty":
         ### if the chosen picture file is jpg or png, assign mime to corresponding
         if pic_path.lower().endswith(".jpg") or pic_path.lower().endswith(".jpeg"):
@@ -57,8 +60,49 @@ def change_mp3_metadata(file_path, title, track_number, artist, album, year, gen
                     data = img.read()
                 )
             )
+
+    ## set/inject optional lyrics
+    if yn_lyrics.lower() == 'y':
+        lyrics = lyric_grabber(artist, title)
+        audio.tags.delall("USLT")
+
+        audio.tags.add(
+            USLT(
+                encoding = 3,
+                lang = lang,
+                desc = "Lyrics",
+                text = lyrics
+            )
+        )
     audio.save()
 
+
+# Function to Grab Lyrics from Genius
+def lyric_grabber(artist, song_name):
+    global genius_token
+    genius = lyricsgenius.Genius(genius_token)
+    ## 
+    try:
+        song = genius.search_song(song_name, artist)
+        song_lyrics = str(song.lyrics)
+        counter = 0
+    
+        for char in song_lyrics:
+            if char != '[':
+                counter += 1
+            else:
+                song_lyrics = song_lyrics[counter:]
+                break
+
+        print(f"{song_name}\n{song_lyrics}")
+
+        return song_lyrics
+
+    except:
+        print("[!] ERROR: Unable to Find Song and it's Lyrics!")
+        return "Unable to Find Lyrics"
+    
+# Stage 2: more questions, with more fine-grained individual inquiries
 def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comment, all_comment):
     ## Ask if they want to inject album art in the file
     yn_picture = input("[?] Do you want to inject Album Art? If so, is it in this folder? (Y/n)\n[?] ")
@@ -78,6 +122,8 @@ def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comme
         yn_disknum = input("[?] Do you want to keep asking about the disk? If no, default is 1. (Y/n)\n[?] ")
     else:
         disk = 1
+
+    yn_lyrics = input("[?] Do you want to search for lyrics for each song? (Y/n)\n[?] ")
 
     ## Loop individually handling individual tracks with individual info
     comment = "empty"
@@ -103,10 +149,11 @@ def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comme
             if yn_disknum.lower() == "y":
                 disk = input("[?] What's the current disk?\n[?] ")
 
-        change_mp3_metadata(file_path, title, track_number, artist, album, year, genre, comment, pic_path, disk, disktotal)
+        change_mp3_metadata(file_path, title, track_number, artist, album, year, genre, comment, pic_path, disk, disktotal, yn_lyrics)
 
 
 # Function to allow user to interface with previous function optimally
+# Stage 1: broad initial inquries
 def metadata_inquiry(dir_path, dir_list):
 
     artist = input("[?] Who is the artist?\n[?] ")
@@ -126,7 +173,8 @@ def main():
     ## before dir path changes, open lyrics token in program root dir
     genius_path = os.path.join(program_dir, 'lyrics.token')
     with open(genius_path, 'r') as file:
-        genius_token = file.readline().strip
+        global genius_token 
+        genius_token = file.readline().strip()
     ## to allow filepath completion
     completion = PathCompleter()
     ## loop seeking desired music directory until satisfied
@@ -146,6 +194,9 @@ def main():
     ## yes
     if filetype_num == 0:
        metadata_inquiry(dir_path, dir_list)
+
+    genius_token = ""
+    print("[!] SUCCESS! Thanks for using this tool :)")
 
 
 main()
