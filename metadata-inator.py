@@ -103,13 +103,13 @@ def lyric_grabber(artist, song_name):
         return "Unable to Find Lyrics"
     
 # Stage 2: more questions, with more fine-grained individual inquiries
-def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comment, all_comment):
+def mp3_metadata_inator(dir_path, select_files, full_dir_list, artist, album, year, genre, yn_comment, all_comment):
     ## Ask if they want to inject album art in the file
     yn_picture = input("[?] Do you want to inject Album Art? If so, is it in this folder? (Y/n)\n[?] ")
     pic_file_list = []
     pic_path = "empty"
     if yn_picture.lower() == "y":
-        for file in dir_list:
+        for file in full_dir_list:
             if file.endswith(tuple(pic_filetypes)):
                 pic_file_list.append(file)
         print("[?] Please pick from the list of picture files below:")
@@ -127,7 +127,7 @@ def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comme
 
     ## Loop individually handling individual tracks with individual info
     comment = "empty"
-    for file in dir_list:
+    for file in select_files:
         ### find mp3s, skip files that ain't mp3
         file_path = os.path.join(dir_path, file)
         if file[-4:].lower() != ".mp3":
@@ -154,7 +154,7 @@ def mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comme
 
 # Function to allow user to interface with previous function optimally
 # Stage 1: broad initial inquries
-def metadata_inquiry(dir_path, dir_list):
+def metadata_inquiry(dir_path, select_files, full_dir_list):
 
     artist = input("[?] Who is the artist?\n[?] ")
     album = input("[?] What is the name of this album?\n[?] ")
@@ -165,7 +165,7 @@ def metadata_inquiry(dir_path, dir_list):
     if yn_comment == "y":
         all_comment = input("[?] Do you want all files to have one comment? (Y/n)\n[?] ")
 
-    mp3_metadata_inator(dir_path, dir_list, artist, album, year, genre, yn_comment, all_comment)
+    mp3_metadata_inator(dir_path, select_files, full_dir_list, artist, album, year, genre, yn_comment, all_comment)
 
 def main():
 
@@ -180,20 +180,31 @@ def main():
     ## loop seeking desired music directory until satisfied
     while True:
         dir_path = prompt("[?] Please enter path to folder/directory below:\n", completer=completion)
-        dir_list = sorted(os.listdir(dir_path))
-        for file in dir_list:
+        select_files = sorted(os.listdir(dir_path))
+        for file in select_files:
             print(f"[*] {file}")
         confirmation = input("[?] Are you sure this is the right directory/folder? (Y/n)\n[?] ")
         if confirmation.lower() == "y":
             break
+    
+    ## Ask the user if they want to have specific music files in loop
+    confirmation = input("[?] Do you want to choose only select files from the dir/folder? (Y/n)\n[?] ")
+    full_dir_list = select_files
+    if confirmation.lower() == "y":
+        [print(f"{select_files.index(file)} {file}") for file in select_files]
+        numbers = input("[?] From the list above, write down the numbers corresponding to the files separated by commas\n[?] (ex: 1, 2, 3, 76): ")
+        num_list = [item.strip() for item in numbers.split(",")]
+        select_files = []
+        select_files = [full_dir_list[int(index)] for index in num_list]
+        print(f"{select_files}")            
 
-    ## ask desired filetype to edit
+    ## user selects filetype
     print("[?] From list below, select number for your desired filetype:")
     [print(f"{filetypes.index(filetype)} {filetype}") for filetype in filetypes]
     filetype_num = int(input("[?] "))
     ## yes
     if filetype_num == 0:
-       metadata_inquiry(dir_path, dir_list)
+       metadata_inquiry(dir_path, select_files, full_dir_list)
 
     genius_token = ""
     print("[!] SUCCESS! Thanks for using this tool :)")
