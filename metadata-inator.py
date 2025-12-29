@@ -1,6 +1,6 @@
 import os
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TRCK, TPE1, TALB, TYER, TCON, COMM, APIC, TPOS, USLT
+from mutagen.id3 import ID3, TIT2, TRCK, TPE1, TPE2, TALB, TYER, TCON, COMM, APIC, TPOS, USLT
 # filepath autocompletion
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
@@ -11,7 +11,7 @@ filetypes = [".mp3", ".flac", ".wav"]
 pic_filetypes = [".png", ".jpg", ".jpeg"]
 
 # The main metadata changer (pretty dang easy stuff), 1 at a time
-def change_mp3_metadata(file_path, title, track_number, artist, album, year, genre, comment, pic_path, disk, disktotal, yn_lyrics):
+def change_mp3_metadata(file_path, title, track_number, artist, primary_artist, various_artists, album, year, genre, comment, pic_path, disk, disktotal, yn_lyrics):
     audio = MP3(file_path, ID3=ID3)
     lang = "eng"
 
@@ -28,6 +28,13 @@ def change_mp3_metadata(file_path, title, track_number, artist, album, year, gen
     tags.setall('TALB', [TALB(encoding=3, text=[str(album)])])
     tags.setall('TYER', [TYER(encoding=3, text=[str(year)])])
     tags.setall('TCON', [TCON(encoding=3, text=[str(genre)])])
+
+    ## if various artist, set album artist to such, if not then just base artist
+    if primary_artist == "0":
+        primary_artist = "Various Artists"
+    elif various_artists == False:
+        primary_artist = str(artist)
+    tags.setall('TPE2', [TPE2(encoding=3, text=str(primary_artist))])
 
     ## metadata for disk total
     if int(disktotal) <= 1:
@@ -104,6 +111,7 @@ def lyric_grabber(artist, song_name):
     
 # Stage 2: more questions, with more fine-grained individual inquiries
 def mp3_metadata_inator(dir_path, select_files, full_dir_list, artist, album, year, genre, yn_comment, all_comment):
+
     ## Ask if they want to inject album art in the file
     yn_picture = input("[?] Do you want to inject Album Art? If so, is it in this folder? (Y/n)\n[?] ")
     pic_file_list = []
@@ -116,18 +124,26 @@ def mp3_metadata_inator(dir_path, select_files, full_dir_list, artist, album, ye
         [print(f"{pic_file_list.index(pic_file)} {pic_file}") for pic_file in pic_file_list]
         pic_choice = int(input("[?] "))
         pic_path = os.path.join(dir_path, pic_file_list[pic_choice])
-
+    
+    ## ask total amount of disks
     disktotal = input("[?] What's the total amount of disks?\n[?] ")
     if int(disktotal) > 1:
         yn_disknum = input("[?] Do you want to keep asking about the disk? If no, default is 1. (Y/n)\n[?] ")
     else:
         disk = 1
 
+    ## inquire if user wants to search for lyrics
     yn_lyrics = input("[?] Do you want to search for lyrics for each song? (Y/n)\n[?] ")
+
+    ## variables for primary/various artist, and set various artists 
+    ## variable to true if artist is 0
+    primary_artist = ""
+    various_artists = True if str(artist) == "0" else False
 
     ## Loop individually handling individual tracks with individual info
     comment = "empty"
     for file in select_files:
+
         ### find mp3s, skip files that ain't mp3
         file_path = os.path.join(dir_path, file)
         if file[-4:].lower() != ".mp3":
@@ -136,7 +152,12 @@ def mp3_metadata_inator(dir_path, select_files, full_dir_list, artist, album, ye
         ### for file/song in question, ask title and number of song
         print(f"[*] {file}")
         title = input("[?] What is the title of the song?\n[?] ")
-        track_number = input("[?] What is the track number of this song?\n[?] ")
+
+        ### if artist is zero, keep asking artist for individual track
+        if various_artists:
+            if artist == "0":
+                primary_artist = input("[?] Who is the primary artist for this album? Type 0 if it's Various Artists\n[?] ")
+            artist = input("[?] Who is the artist for this track?\n[?] ")
 
         ### ask about comment, and if only one comment for all, change yn comment to prevent asking again
         if yn_comment.lower() == "y":
@@ -149,14 +170,17 @@ def mp3_metadata_inator(dir_path, select_files, full_dir_list, artist, album, ye
             if yn_disknum.lower() == "y":
                 disk = input("[?] What's the current disk?\n[?] ")
 
-        change_mp3_metadata(file_path, title, track_number, artist, album, year, genre, comment, pic_path, disk, disktotal, yn_lyrics)
+        track_number = input("[?] What is the track number of this song?\n[?] ")
+
+
+        change_mp3_metadata(file_path, title, track_number, artist, primary_artist, various_artists, album, year, genre, comment, pic_path, disk, disktotal, yn_lyrics)
 
 
 # Function to allow user to interface with previous function optimally
 # Stage 1: broad initial inquries
 def metadata_inquiry(dir_path, select_files, full_dir_list):
 
-    artist = input("[?] Who is the artist?\n[?] ")
+    artist = input("[?] Who is the artist? Type 0 in case there is more than one\n[?] ")
     album = input("[?] What is the name of this album?\n[?] ")
     year = input("[?] What is the year of the album?\n[?] ")
     genre = input("[?] What is the genre?\n[?] ")
@@ -191,7 +215,7 @@ def main():
     confirmation = input("[?] Do you want to choose only select files from the dir/folder? (Y/n)\n[?] ")
     full_dir_list = select_files
     if confirmation.lower() == "y":
-        [print(f"{select_files.index(file)} {file}") for file in select_files]
+        [print(f"[{select_files.index(file)}]:- {file}") for file in select_files]
         numbers = input("[?] From the list above, write down the numbers corresponding to the files separated by commas\n[?] (ex: 1, 2, 3, 76): ")
         num_list = [item.strip() for item in numbers.split(",")]
         select_files = []
